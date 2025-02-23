@@ -1,0 +1,16 @@
+# Ignore virtual environment folder
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore Streamlit and Jupyter cache files
+.streamlit/
+.ipynb_checkpoints/
+
+# Ignore large system files
+.DS_Store
+.env
