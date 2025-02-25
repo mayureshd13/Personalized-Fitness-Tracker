@@ -30,13 +30,12 @@ st.write("A smart app to track your fitness, sleep, and overall health! 🚀")
 @st.cache_data
 def load_data():
     exercise_df = pd.read_csv("exercises.csv", encoding="ISO-8859-1")
-    fitness_df = pd.read_csv("fitness_dataset.csv", encoding="ISO-8859-1")
     sleep_df = pd.read_csv("sleep_health_dataset.csv", encoding="ISO-8859-1")
     diet_df = pd.read_csv("All_Diets.csv", encoding="ISO-8859-1")
 
-    return fitness_df, sleep_df, diet_df, exercise_df
+    return sleep_df, diet_df, exercise_df
 
-fitness_df, sleep_df, diet_df, exercise_df = load_data()
+sleep_df, diet_df, exercise_df = load_data()
 
 # Sidebar - User Inputs
 st.sidebar.header("👤 User Input")
@@ -333,8 +332,8 @@ st.metric("⚡ Accuracy", f"{model_accuracy:.2f}%")
 # Custom Styled Thin Progress Bar
 progress_html = f"""
     <div style="width: 100%; background-color: #ddd; border-radius: 5px;">
-        <div style="width: {model_accuracy}%; background-color: {bar_color}; padding: 3px; 
-                    text-align: center; color: white; font-weight: bold; border-radius: 5px; font-size: 12px;">
+        <div style="width: {model_accuracy}%; background-color: {bar_color}; padding: 1px; 
+                    text-align: center; color: white; font-weight: bold; border-radius: 5px; font-size: 9px;">
             {model_accuracy:.2f}%
         </div>
     </div>
