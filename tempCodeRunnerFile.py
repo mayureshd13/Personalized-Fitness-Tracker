@@ -3,36 +3,36 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import accuracy_score, mean_absolute_error
+import os
 
 # Set Page Configuration
 st.set_page_config(page_title="Personal Fitness Tracker", page_icon="🏋️", layout="wide")
 
-# Apply Dark Theme with Custom CSS
-st.markdown("""
-    <style>
-        body { background-color: #1e1e1e; color: white; }
-        .big-font { font-size: 24px !important; font-weight: bold; color: #ff4b4b; }
-        .metric { font-size: 20px !important; font-weight: bold; color: #00ffcc; }
-        .success { font-size: 18px !important; color: #66ff66; }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('<p class="big-font">🏋️ Personal Fitness Tracker</p>', unsafe_allow_html=True)
-st.write("A smart app to track your fitness, sleep, and overall health! 🚀")
-
 # Load Datasets
 @st.cache_data
 def load_data():
-    exercise_df = pd.read_csv("exercises.csv", encoding="ISO-8859-1")
-    fitness_df = pd.read_csv("fitness_dataset.csv", encoding="ISO-8859-1")
-    sleep_df = pd.read_csv("sleep_health_dataset.csv", encoding="ISO-8859-1")
-    diet_df = pd.read_csv("All_Diets.csv", encoding="ISO-8859-1")
+    try:
+        calories_df = pd.read_csv("calories_dataset.csv", encoding="ISO-8859-1")
+        fitness_df = pd.read_csv("fitness_dataset.csv", encoding="ISO-8859-1")
+        sleep_df = pd.read_csv("sleep_health_dataset.csv", encoding="ISO-8859-1")
+        diet_df = pd.read_csv("All_Diets.csv", encoding="ISO-8859-1")
+        
+        if "Activity, Exercise" in calories_df.columns:
+            calories_df.rename(columns={"Activity, Exercise": "Activity"}, inplace=True)
 
-    return fitness_df, sleep_df, diet_df, exercise_df
+        return calories_df, fitness_df, sleep_df, diet_df
+    except FileNotFoundError:
+        st.error("Error: One or more datasets are missing. Please check your file paths.")
+        return None, None, None, None
 
-fitness_df, sleep_df, diet_df, exercise_df = load_data()
+calories_df, fitness_df, sleep_df, diet_df = load_data()
+if None in (calories_df, fitness_df, sleep_df, diet_df):
+    st.stop()  # Stop execution if datasets are missing
 
 # Sidebar - User Inputs
 st.sidebar.header("👤 User Input")
@@ -45,42 +45,79 @@ with st.sidebar.expander("🏋️ Fitness Details", expanded=True):
     body_temp = st.slider("Body Temperature During Exercise (°C)", 35.0, 40.0, 37.0)
     duration = st.slider("Exercise Duration (mins)", 10, 120, 30)
 
-# Sleep Analysis Inputs
-with st.sidebar.expander("🌙 Sleep Details", expanded=False):
-    sleep_duration = st.slider("Sleep Duration (hrs)", 3, 12, 7)
-    sleep_quality = st.select_slider("Sleep Quality", ["Poor", "Average", "Good", "Excellent"], value="Good")
-    stress_level = st.slider("Stress Level (1-10)", 1, 10, 5)
+with st.sidebar.expander("📌 Activity Details", expanded=False):
+    activity_level = st.selectbox("Activity Level", ["Sedentary", "Light", "Moderate", "Active", "Very Active"])
+    if "Activity" in calories_df.columns:
+        exercise_type = st.selectbox("Exercise Type", calories_df["Activity"].unique())
+    else:
+        st.error("'Activity' column not found in Calories dataset.")
 
-# Calculate BMI
+# Feature Engineering
 bmi = round(weight / ((height / 100) ** 2), 2)
+activity_METs = {"Sedentary": 1.2, "Light": 2.5, "Moderate": 5.0, "Active": 7.0, "Very Active": 9.0}
+calories_burned = round(activity_METs[activity_level] * weight * (duration / 60), 2)
 
-# Prepare the dataset for training
-exercise_df = exercise_df.dropna()  # type: ignore # Remove missing values
-X = exercise_df[['Weight', 'Height', 'Age', 'Heart_Rate', 'Body_Temp', 'Duration']]
-y = exercise_df['Calories']
+# Ensure fitness_df has required columns
+required_cols = ["Age", "Weight", "Height", "Heart Rate", "Exercise Duration", "Fitness Level", "Calories Burned"]
+if not all(col in fitness_df.columns for col in required_cols):
+    st.error("Error: Missing columns in the fitness dataset. Please check the dataset.")
+    st.stop()
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Fill missing values instead of dropping
+fitness_df.fillna(fitness_df.mean(), inplace=True)
 
-# Train Random Forest Model
-rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+# Prepare Data for Machine Learning
+X_fitness = fitness_df[["Age", "Weight", "Height", "Heart Rate", "Exercise Duration"]]
+y_fitness = fitness_df["Fitness Level"]
+label_encoder = LabelEncoder()
+y_fitness = label_encoder.fit_transform(y_fitness)
+
+X_train, X_test, y_train, y_test = train_test_split(X_fitness, y_fitness, test_size=0.2, random_state=42)
+
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
 rf_model.fit(X_train, y_train)
+y_pred = rf_model.predict(X_test)
+fitness_accuracy = accuracy_score(y_test, y_pred)
 
-# Prepare user input for prediction
-user_input = pd.DataFrame([[weight, height, age, heart_rate, body_temp, duration]],
-                          columns=['Weight', 'Height', 'Age', 'Heart_Rate', 'Body_Temp', 'Duration'])
+# Predict User's Fitness Level
+user_input = np.array([[age, weight, height, heart_rate, duration]])
+user_fitness_pred = rf_model.predict(user_input.reshape(1, -1))[0]
 
-# Predict calories burned
-calories_burned = round(rf_model.predict(user_input)[0], 2)
+# Ensure prediction is valid before decoding
+if user_fitness_pred in label_encoder.classes_:
+    user_fitness_level = label_encoder.inverse_transform([user_fitness_pred])[0]
+else:
+    user_fitness_level = "Unknown"
 
-# Display Metrics
-col1, col2, col3 = st.columns(3)
+# Prepare Data for Calories Burned Prediction
+X_calories = fitness_df[["Age", "Weight", "Height", "Heart Rate", "Exercise Duration"]]
+y_calories = fitness_df["Calories Burned"]
+
+scaler = StandardScaler()
+X_calories_scaled = scaler.fit_transform(X_calories)
+
+X_train_c, X_test_c, y_train_c, y_test_c = train_test_split(X_calories_scaled, y_calories, test_size=0.2, random_state=42)
+
+lr_model = LinearRegression()
+lr_model.fit(X_train_c, y_train_c)
+y_calories_pred = lr_model.predict(X_test_c)
+calories_mae = mean_absolute_error(y_test_c, y_calories_pred)
+
+# Predict Calories Burned for User Input
+user_calories_pred = lr_model.predict(scaler.transform(user_input))[0]
+
+# Display Results
+st.metric("📊 Predicted Fitness Level", user_fitness_level)
+st.metric("🔥 Predicted Calories Burned", f"{user_calories_pred:.2f} kcal")
+st.write(f"Fitness Model Accuracy: {fitness_accuracy * 100:.2f}%")
+st.write(f"Calories Prediction Error: {calories_mae:.2f} kcal")
+
+# Display BMI & Calories Burned
+col1, col2 = st.columns(2)
 with col1:
     st.metric("📊 Your BMI", f"{bmi}")
 with col2:
     st.metric("🔥 Calories Burned", f"{calories_burned} kcal")
-with col3:
-    st.metric("😴 Sleep Duration", f"{sleep_duration} hrs")
 
 # Fitness Score Calculation (Responsive to Inputs)
 def calculate_fitness_score(weight, height, age, gender, heart_rate, body_temp, duration, bmi):
@@ -276,6 +313,14 @@ if sleep_duration < 6:
     tips.append("Maintain a consistent sleep schedule daily.")
     tips.append("Limit caffeine intake in the evening.")
     tips.append("Create a relaxing bedtime routine.")
+
+# Activity Level-Based Tips
+if activity_level in ["Sedentary", "Light"]:
+    tips.append("Incorporate at least 30 minutes of daily physical activity.")
+    tips.append("Take short walks after meals to boost digestion.")
+    tips.append("Use stairs instead of elevators whenever possible.")
+    tips.append("Stretch regularly to improve flexibility.")
+    tips.append("Consider desk exercises if you work long hours sitting.")
 
 # Display the tips
 st.subheader("💡 Useful Tips for You")
