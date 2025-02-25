@@ -5,6 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score
+import plotly.graph_objects as go
+
+
 
 # Set Page Configuration
 st.set_page_config(page_title="Personal Fitness Tracker", page_icon="🏋️", layout="wide")
@@ -55,8 +59,12 @@ with st.sidebar.expander("🌙 Sleep Details", expanded=False):
 bmi = round(weight / ((height / 100) ** 2), 2)
 
 # Prepare the dataset for training
-exercise_df = exercise_df.dropna()  # type: ignore # Remove missing values
-X = exercise_df[['Weight', 'Height', 'Age', 'Heart_Rate', 'Body_Temp', 'Duration']]
+exercise_df = exercise_df.dropna()  # Remove missing values
+
+# Encode Gender (Male = 1, Female = 0)
+exercise_df['Gender'] = exercise_df['Gender'].map({'Male': 1, 'Female': 0})
+
+X = exercise_df[['Weight', 'Height', 'Age', 'Gender', 'Heart_Rate', 'Body_Temp', 'Duration']]
 y = exercise_df['Calories']
 
 # Train-test split
@@ -66,9 +74,12 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_model.fit(X_train, y_train)
 
-# Prepare user input for prediction
-user_input = pd.DataFrame([[weight, height, age, heart_rate, body_temp, duration]],
-                          columns=['Weight', 'Height', 'Age', 'Heart_Rate', 'Body_Temp', 'Duration'])
+# Convert gender input from user
+gender_value = 1 if gender == "Male" else 0
+
+# Prepare user input for prediction (with gender included)
+user_input = pd.DataFrame([[weight, height, age, gender_value, heart_rate, body_temp, duration]],
+                          columns=['Weight', 'Height', 'Age', 'Gender', 'Heart_Rate', 'Body_Temp', 'Duration'])
 
 # Predict calories burned
 calories_burned = round(rf_model.predict(user_input)[0], 2)
@@ -164,6 +175,8 @@ elif fitness_score > 50:
 else:
     st.error("🚨 It looks like you may need to focus more on fitness and exercise.")
 
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
+
 # Correlation Between Sleep, Stress, and BMI
 st.markdown("<p class='big-font'>📈 Sleep, Stress & BMI Correlation</p>", unsafe_allow_html=True)
 stress_bmi_fig = px.scatter(sleep_df, x='Stress Level', y='BMI Category', color='Sleep Duration', 
@@ -181,7 +194,8 @@ else:
 
 if stress_level > 7:
     st.error("🚨 High stress levels detected! Try meditation, exercise, or relaxation techniques.")
-    
+
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
 # Create a table for user input parameters
 user_params = {
@@ -201,11 +215,30 @@ user_df = pd.DataFrame(user_params)
 st.subheader("Your Input Parameters:")
 st.table(user_df)
 
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
-# Show Sample Data
-st.subheader("📂 Other Results ")
-st.write(fitness_df.head())
+# Find Similar Data Points
+st.subheader("🔍 Similar Data from Dataset")
 
+# Define a similarity threshold (you can adjust these values)
+tolerance = 5  # Allow a small variation in matching values
+
+# Filter dataset based on similar attributes
+similar_data = exercise_df[
+    (exercise_df['Weight'].between(weight - tolerance, weight + tolerance)) &
+    (exercise_df['Height'].between(height - tolerance, height + tolerance)) &
+    (exercise_df['Age'].between(age - tolerance, age + tolerance)) &
+    (exercise_df['Duration'].between(duration - 5, duration + 5))
+]
+
+# Show the table if similar records exist
+if not similar_data.empty:
+    st.write("📊 Here are some similar records from the dataset:")
+    st.table(similar_data[['Weight', 'Height', 'Age', 'Duration', 'Calories']].head(5).reset_index(drop=True))
+else:
+    st.write("⚠️ No closely matching data found in the dataset.")
+
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
 # Diet Recommendation Section
 st.subheader("🥗 Personalized Diet Recommendations")
@@ -239,6 +272,8 @@ st.subheader("🍽️ Diet Recommendations")
 diet_recommendations_display = diet_df[diet_df["Diet_type"].str.lower().str.contains(diet_type.lower(), na=False)].head(5)
 
 st.table(diet_recommendations_display[["Recipe_name", "Cuisine_type", "Protein(g)", "Carbs(g)", "Fat(g)"]])
+
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
 # Generate Personalized Tips
 tips = []
@@ -281,3 +316,27 @@ if sleep_duration < 6:
 st.subheader("💡 Useful Tips for You")
 for tip in tips[:5]:  # Show only the top 5 tips
     st.write(f"✅ {tip}")
+
+st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
+
+# Predict on test data
+y_pred = rf_model.predict(X_test)
+model_accuracy = r2_score(y_test, y_pred) * 100  
+
+# Accuracy bar color logic
+bar_color = "red" if model_accuracy < 50 else "yellow" if model_accuracy < 75 else "green"
+
+# Streamlit UI
+st.subheader("🎯 Model Accuracy")
+st.metric("⚡ Accuracy", f"{model_accuracy:.2f}%")
+
+# Custom Styled Thin Progress Bar
+progress_html = f"""
+    <div style="width: 100%; background-color: #ddd; border-radius: 5px;">
+        <div style="width: {model_accuracy}%; background-color: {bar_color}; padding: 3px; 
+                    text-align: center; color: white; font-weight: bold; border-radius: 5px; font-size: 12px;">
+            {model_accuracy:.2f}%
+        </div>
+    </div>
+"""
+st.markdown(progress_html, unsafe_allow_html=True)
