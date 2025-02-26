@@ -173,11 +173,33 @@ else:
 
 st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
-# Correlation Between Sleep, Stress, and BMI
+# 📊 Improved Correlation Chart: Sleep, Stress & BMI
 st.markdown("<p class='big-font'>📈 Sleep, Stress & BMI Correlation</p>", unsafe_allow_html=True)
-stress_bmi_fig = px.scatter(sleep_df, x='Stress Level', y='BMI Category', color='Sleep Duration', 
-                            title='💡 Impact of Stress & Sleep on BMI')
-st.plotly_chart(stress_bmi_fig)
+
+# Create an improved bubble chart
+stress_bmi_fig = px.scatter(
+    sleep_df,
+    x="Stress Level",
+    y="BMI Category",
+    size="Sleep Duration",  # Bubble size based on sleep duration
+    color="Sleep Duration",  # Color gradient based on sleep duration
+    hover_data=["Age", "Gender"],  # Show additional details on hover
+    title="💡 Impact of Stress & Sleep on BMI",
+    size_max=20,  # Limit max bubble size for better visibility
+    color_continuous_scale="Viridis",  # Better color scale for contrast
+)
+
+# Add layout improvements
+stress_bmi_fig.update_layout(
+    xaxis_title="Stress Level (1-10)",
+    yaxis_title="BMI Category",
+    template="plotly_dark",  # Dark theme for better UI contrast
+    margin=dict(l=40, r=40, t=60, b=40),  # Better spacing
+    height=500  # Responsive height
+)
+
+# Display the updated chart
+st.plotly_chart(stress_bmi_fig, use_container_width=True)
 
 # Sleep Analysis Insights
 st.subheader("🌙 Sleep & Stress Insights")
@@ -210,11 +232,18 @@ user_df = pd.DataFrame(user_params)
 # Display the table
 st.subheader("Your Input Parameters:")
 st.table(user_df)
+st.markdown("""
+    <style>
+    table td, table th {
+        text-align: center !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.markdown("<hr style='border: 1px solid gray;'>", unsafe_allow_html=True)
 
 # Find Similar Data Points
-st.subheader("🔍 Similar Data from Dataset")
+st.subheader("🔍 Similar Data ")
 
 # Define a similarity threshold (you can adjust these values)
 tolerance = 5  # Allow a small variation in matching values
@@ -229,7 +258,16 @@ similar_data = exercise_df[
 
 # Show the table if similar records exist
 if not similar_data.empty:
-    st.write("📊 Here are some similar records from the dataset:")
+    st.write("📊 Here are some similar records:")
+    # Apply CSS to center-align table content
+    st.markdown("""
+    <style>
+    table td, table th {
+        text-align: center !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
     st.table(similar_data[['Weight', 'Height', 'Age', 'Duration', 'Calories']].head(5).reset_index(drop=True))
 else:
     st.write("⚠️ No closely matching data found in the dataset.")
@@ -265,7 +303,7 @@ st.plotly_chart(fig)
 # Display a few diet recommendations
 st.write(f"Based on your BMI ({bmi}), we recommend a {diet_type} diet.")
 st.subheader("🍽️ Diet Recommendations")
-diet_recommendations_display = diet_df[diet_df["Diet_type"].str.lower().str.contains(diet_type.lower(), na=False)].head(5)
+diet_recommendations_display = diet_df[diet_df["Diet_type"].str.lower().str.contains(diet_type.lower(), na=False)].head(5).reset_index(drop=True)
 
 st.table(diet_recommendations_display[["Recipe_name", "Cuisine_type", "Protein(g)", "Carbs(g)", "Fat(g)"]])
 
