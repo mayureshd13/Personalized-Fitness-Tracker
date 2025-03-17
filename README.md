@@ -20,7 +20,7 @@ Technologies Used
 
 Installation Guide
 1️⃣ Clone the Repository:
-git clone https://github.com/your-repo-url.git
+git clone (url)
 cd personal-fitness-tracker
 2️⃣ Install Dependencies:
 pip install streamlit pandas numpy matplotlib
